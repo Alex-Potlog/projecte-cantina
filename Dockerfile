@@ -11,6 +11,8 @@ RUN a2enmod rewrite
 COPY ./public /var/www/html/
 COPY ./php /var/www/html/php/
 COPY ./data /var/www/html/data/
+COPY ./tiquets /var/www/html/tiquets/
+COPY ./users /var/www/html/users/
 
 # Configurem els permisos adequats
 RUN chown -R www-data:www-data /var/www/html \
