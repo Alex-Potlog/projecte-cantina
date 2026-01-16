@@ -1,0 +1,7 @@
+RewriteEngine On
+RewriteRule ^menu/?$ /index.html [L] # Redirigeix la uri localhost/menu a index.html
+DirectoryIndex index.html # Quan s'entra al host sense cap param, redirigeix a index.html
+
+# Capçaleres de seguretat HTTP
+Header always set X-Content-Type-Options "nosniff"
+Header always set X-Frame-Options "SAMEORIGIN"

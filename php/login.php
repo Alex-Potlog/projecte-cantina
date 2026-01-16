@@ -1,5 +1,6 @@
 <?php
 session_start();
+require_once 'Logger.php';
 
 // Recuperar la informació que s'està passant pel document login.js
 header('Content-Type: application/json');
@@ -36,12 +37,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['usuari'] = $usuariTrobat["nom"];
             $_SESSION['admin'] = $usuariTrobat["admin"];
             $resposta["correcte"]=true;
+            
+            // Registrar login exitós
+            Logger::loginAttempt($nombre, true, $usuariTrobat["admin"]);
+            
             echo json_encode($resposta);
             exit();
         } else{
+            // Registrar intent de login amb contrasenya incorrecta
+            Logger::loginAttempt($nombre, false);
+            Logger::warning("Password mismatch for user: $nombre");
             echo json_encode($resposta);
         }
     } else{
+        // Registrar intent de login amb usuari inexistent
+        Logger::loginAttempt($nombre, false);
+        Logger::warning("Non-existent user attempt: $nombre");
         echo json_encode($resposta);
     }
 }

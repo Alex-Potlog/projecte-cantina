@@ -4,8 +4,8 @@ FROM php:8.2-apache
 # Instal·lem extensions de PHP si són necessàries
 RUN docker-php-ext-install mysqli pdo pdo_mysql
 
-# Habilitem el mod_rewrite d'Apache per URLs amigables
-RUN a2enmod rewrite
+# Habilitem el mod_rewrite i mod_headers d'Apache
+RUN a2enmod rewrite headers
 
 # Copiem els fitxers del projecte al directori d'Apache
 COPY ./public /var/www/html/
@@ -14,9 +14,13 @@ COPY ./data /var/www/html/data/
 COPY ./tiquets /var/www/html/tiquets/
 COPY ./users /var/www/html/users/
 
+# Creem el directori de logs
+RUN mkdir -p /var/www/html/logs
+
 # Configurem els permisos adequats
 RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 755 /var/www/html
+    && chmod -R 777 /var/www/html \
+    && chmod -R 777 /var/www/html/logs
 
 # Exposem el port 80
 EXPOSE 80

@@ -14,3 +14,30 @@ _book
 *.epub
 *.mobi
 *.pdf
+
+# Logs del projecte
+logs/
+*.log
+*.log.*
+
+# Fitxers d'entorn
+.env
+.env.local
+
+# Cache
+cache/
+*.cache
+
+# Backups
+*.backup
+*.bak
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

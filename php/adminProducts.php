@@ -1,4 +1,5 @@
 <?php
+require_once 'Logger.php';
 header('Content-Type: application/json');
 
 $json_file = '../data/products/products.json';
@@ -69,6 +70,7 @@ function uploadImage($file)
 
 // Mostrar TOTS els productes
 if ($accio == 'listar') {
+    Logger::access('List all products', true);
     echo json_encode([
         'success' => true,
         'products' => $productes
@@ -108,11 +110,13 @@ elseif ($accio == 'añadir') {
     // guardar al JSON
     $data['productes'] = $productes;
     if (file_put_contents($json_file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))) {
+        Logger::productOperation('Added', $new_product);
         echo json_encode([
             'success' => true,
             'message' => 'Producte afegit correctament'
         ]);
     } else {
+        Logger::error('Failed to save product to JSON', ['action' => 'añadir', 'product' => $new_product]);
         echo json_encode([
             'success' => false,
             'message' => 'Error al guardar al arxiu JSON'
@@ -171,11 +175,13 @@ elseif ($accio == 'editar') {
     // guardar al JSON
     $data['productes'] = $productes;
     if (file_put_contents($json_file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))) {
+        Logger::productOperation('Updated', ['index' => $index, 'nom' => $productes[$index]['nom']]);
         echo json_encode([
             'success' => true,
             'message' => 'Producte actualitzat correctament'
         ]);
     } else {
+        Logger::error('Failed to update product', ['action' => 'editar', 'index' => $index]);
         echo json_encode([
             'success' => false,
             'message' => 'Error al guardar al arxiu JSON'
@@ -207,11 +213,13 @@ elseif ($accio == 'eliminar') {
     // guardar al JSON
     $data['productes'] = $productes;
     if (file_put_contents($json_file, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))) {
+        Logger::productOperation('Deleted', ['index' => $index, 'imatge' => $img_to_delete]);
         echo json_encode([
             'success' => true,
             'message' => 'Producte eliminat correctament'
         ]);
     } else {
+        Logger::error('Failed to delete product', ['action' => 'eliminar', 'index' => $index]);
         echo json_encode([
             'success' => false,
             'message' => 'Error al guardar al arxiu JSON'

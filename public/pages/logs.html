@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualització de Logs - Administració</title>
+    <link rel="stylesheet" href="../css/style.min.css">
+    <style>
+        .logs-container {
+            max-width: 1400px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .logs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .log-controls {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .log-controls button,
+        .log-controls select {
+            padding: 0.5rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fff;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .log-controls button:hover {
+            background: #f0f0f0;
+        }
+        
+        .log-viewer {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        
+        .log-line {
+            margin-bottom: 0.25rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .log-line.error {
+            color: #f48771;
+        }
+        
+        .log-line.warning {
+            color: #dcdcaa;
+        }
+        
+        .log-line.info {
+            color: #4ec9b0;
+        }
+        
+        .log-line.success {
+            color: #6a9955;
+        }
+        
+        .log-line.failure {
+            color: #f48771;
+        }
+        
+        .log-stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .stat-card h3 {
+            margin: 0 0 0.5rem 0;
+            font-size: 0.9rem;
+            color: #666;
+        }
+        
+        .stat-card .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .error-message {
+            background: #fee;
+            border: 1px solid #fcc;
+            color: #c33;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+        
+        .timestamp {
+            color: #858585;
+        }
+        
+        .ip {
+            color: #569cd6;
+        }
+        
+        .user {
+            color: #4ec9b0;
+        }
+    </style>
+</head>
+<body>
+    <div class="logs-container">
+        <div class="logs-header">
+            <h1>Visualització de Logs</h1>
+            <a href="administracio.html" class="btn">← Tornar a Administració</a>
+        </div>
+        
+        <div class="log-stats" id="logStats">
+            <!-- Estadístiques dinàmiques -->
+        </div>
+        
+        <div class="log-controls">
+            <select id="logFileSelect">
+                <option value="">Selecciona un fitxer de log...</option>
+            </select>
+            
+            <select id="linesSelect">
+                <option value="50">Últimes 50 línies</option>
+                <option value="100" selected>Últimes 100 línies</option>
+                <option value="200">Últimes 200 línies</option>
+                <option value="500">Últimes 500 línies</option>
+                <option value="1000">Últimes 1000 línies</option>
+            </select>
+            
+            <button onclick="refreshLogs()">🔄 Actualitzar</button>
+            <button onclick="downloadLog()">⬇️ Descarregar</button>
+            <button onclick="clearLog()">🗑️ Netejar Log</button>
+            <button onclick="cleanOldLogs()">🧹 Netejar Antics (30 dies)</button>
+            
+            <label style="margin-left: auto;">
+                <input type="checkbox" id="autoRefresh"> Auto-actualitzar (10s)
+            </label>
+        </div>
+        
+        <div id="errorMessage" class="error-message" style="display: none;"></div>
+        
+        <div class="log-viewer" id="logViewer">
+            <div class="loading">Selecciona un fitxer de log per visualitzar...</div>
+        </div>
+    </div>
+    
+    <script>
+        let autoRefreshInterval = null;
+        
+        // Carregar llista de logs a l'inici
+        document.addEventListener('DOMContentLoaded', () => {
+            loadLogsList();
+            
+            // Auto-refresh checkbox
+            document.getElementById('autoRefresh').addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    autoRefreshInterval = setInterval(refreshLogs, 10000);
+                } else {
+                    if (autoRefreshInterval) {
+                        clearInterval(autoRefreshInterval);
+                        autoRefreshInterval = null;
+                    }
+                }
+            });
+            
+            // Canvi de fitxer
+            document.getElementById('logFileSelect').addEventListener('change', refreshLogs);
+            document.getElementById('linesSelect').addEventListener('change', refreshLogs);
+        });
+        
+        async function loadLogsList() {
+            try {
+                const response = await fetch('../php/viewLogs.php?action=list');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const select = document.getElementById('logFileSelect');
+                    select.innerHTML = '<option value="">Selecciona un fitxer de log...</option>';
+                    
+                    data.logs.forEach(log => {
+                        const option = document.createElement('option');
+                        option.value = log.name;
+                        const size = (log.size / 1024).toFixed(2);
+                        const date = new Date(log.modified * 1000).toLocaleString('ca');
+                        option.textContent = `${log.name} (${size} KB - ${date})`;
+                        select.appendChild(option);
+                    });
+                    
+                    updateStats(data.logs);
+                }
+            } catch (error) {
+                showError('Error carregant la llista de logs: ' + error.message);
+            }
+        }
+        
+        function updateStats(logs) {
+            const statsContainer = document.getElementById('logStats');
+            const totalSize = logs.reduce((sum, log) => sum + log.size, 0);
+            const totalFiles = logs.length;
+            
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <h3>Total Fitxers</h3>
+                    <div class="value">${totalFiles}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Espai Total</h3>
+                    <div class="value">${(totalSize / 1024 / 1024).toFixed(2)} MB</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Log Més Recent</h3>
+                    <div class="value">${logs.length > 0 ? logs[0].name : 'N/A'}</div>
+                </div>
+            `;
+        }
+        
+        async function refreshLogs() {
+            const fileSelect = document.getElementById('logFileSelect');
+            const linesSelect = document.getElementById('linesSelect');
+            const file = fileSelect.value;
+            const lines = linesSelect.value;
+            
+            if (!file) {
+                document.getElementById('logViewer').innerHTML = 
+                    '<div class="loading">Selecciona un fitxer de log per visualitzar...</div>';
+                return;
+            }
+            
+            document.getElementById('logViewer').innerHTML = 
+                '<div class="loading">Carregant...</div>';
+            
+            try {
+                const response = await fetch(`../php/viewLogs.php?action=read&file=${file}&lines=${lines}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayLog(data.content, data.totalLines);
+                    hideError();
+                } else {
+                    showError(data.error || 'Error carregant el log');
+                }
+            } catch (error) {
+                showError('Error: ' + error.message);
+            }
+        }
+        
+        function displayLog(content, totalLines) {
+            const viewer = document.getElementById('logViewer');
+            
+            if (!content || content.trim() === '') {
+                viewer.innerHTML = '<div class="loading">El fitxer de log està buit</div>';
+                return;
+            }
+            
+            const lines = content.split('\n');
+            let html = `<div style="margin-bottom: 1rem; color: #858585;">Mostrant les últimes ${lines.length} de ${totalLines} línies</div>`;
+            
+            lines.forEach(line => {
+                if (line.trim() === '') return;
+                
+                let className = 'log-line';
+                let formattedLine = line;
+                
+                // Detectar tipus de línia
+                if (line.includes('[ERROR]')) {
+                    className += ' error';
+                } else if (line.includes('[WARNING]')) {
+                    className += ' warning';
+                } else if (line.includes('[INFO]')) {
+                    className += ' info';
+                } else if (line.includes('[SUCCESS]')) {
+                    className += ' success';
+                } else if (line.includes('[FAILURE]')) {
+                    className += ' failure';
+                }
+                
+                // Format amb colors
+                formattedLine = formattedLine
+                    .replace(/(\[[\d\-: ]+\])/g, '<span class="timestamp">$1</span>')
+                    .replace(/(\[IP: [^\]]+\])/g, '<span class="ip">$1</span>')
+                    .replace(/(\[User: [^\]]+\])/g, '<span class="user">$1</span>');
+                
+                html += `<div class="${className}">${formattedLine}</div>`;
+            });
+            
+            viewer.innerHTML = html;
+            viewer.scrollTop = viewer.scrollHeight; // Scroll to bottom
+        }
+        
+        async function downloadLog() {
+            const file = document.getElementById('logFileSelect').value;
+            if (!file) {
+                alert('Selecciona un fitxer primer');
+                return;
+            }
+            
+            window.location.href = `../php/viewLogs.php?action=download&file=${file}`;
+        }
+        
+        async function clearLog() {
+            const file = document.getElementById('logFileSelect').value;
+            if (!file) {
+                alert('Selecciona un fitxer primer');
+                return;
+            }
+            
+            if (!confirm(`Segur que vols netejar ${file}? Es crearà un backup.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`../php/viewLogs.php?action=clear&file=${file}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`Log netejat. Backup: ${data.backup}`);
+                    refreshLogs();
+                    loadLogsList();
+                } else {
+                    showError(data.error || 'Error netejant el log');
+                }
+            } catch (error) {
+                showError('Error: ' + error.message);
+            }
+        }
+        
+        async function cleanOldLogs() {
+            if (!confirm('Segur que vols eliminar els logs amb més de 30 dies?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('../php/viewLogs.php?action=clean-old&days=30');
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(data.message);
+                    loadLogsList();
+                } else {
+                    showError(data.error || 'Error netejant logs antics');
+                }
+            } catch (error) {
+                showError('Error: ' + error.message);
+            }
+        }
+        
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+        
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
